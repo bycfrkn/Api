@@ -1,22 +1,31 @@
-# Build aşaması
-FROM mcr.microsoft.com/dotnet/core/sdk:3.1 AS build-env
+# See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
+
+# This stage is used when running from VS in fast mode (Default for Debug configuration)
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+USER app
 WORKDIR /app
+EXPOSE 8080
+EXPOSE 8081
 
-# Proje dosyasını kopyala ve bağımlılıkları indir
-COPY *.csproj . 
-RUN dotnet restore
 
-# Tüm dosyaları kopyala ve projeyi yayımla
-COPY . ./
-RUN dotnet publish -c Release -o out
+# This stage is used to build the service project
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG BUILD_CONFIGURATION=Release
+WORKDIR /src
+COPY ["WebApplication2.csproj", "WebApplication2/"]
+RUN dotnet restore "./WebApplication2/WebApplication2.csproj"
+COPY . .
+WORKDIR "/src/WebApplication2"
+RUN dotnet build "./WebApplication2.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
-# Çalışma aşaması
-FROM mcr.microsoft.com/dotnet/core/aspnet:3.1
+# This stage is used to publish the service project to be copied to the final stage
+FROM build AS publish
+ARG BUILD_CONFIGURATION=Release
+RUN dotnet publish "./WebApplication2.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+
+# This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
+FROM base AS final
 WORKDIR /app
-
-# Build aşamasından çıktıları kopyala
-COPY --from=build-env /app/out .
-
-# Çalıştırılacak uygulamayı tanımla
-ENTRYPOINT ["dotnet", "Api.dll"]
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "WebApplication2.dll"]
 
