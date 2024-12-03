@@ -21,7 +21,8 @@ RUN dotnet build "./WebApplication2.csproj" -c $BUILD_CONFIGURATION -o /app/buil
 # This stage is used to publish the service project to be copied to the final stage
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./WebApplication2.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet restore "./WebApplication2/WebApplication2.csproj"
+
 
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
 FROM base AS final
